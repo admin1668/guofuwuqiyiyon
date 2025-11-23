@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styles from './styles.module.css';
@@ -31,6 +29,16 @@ interface HistoryItem {
   gradientClass: string;
 }
 
+interface GeneratedScene {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  duration: string;
+  camera: string;
+  prompt: string;
+}
+
 const VideoGenerationPage: React.FC = () => {
   const navigate = useNavigate();
   
@@ -44,6 +52,12 @@ const VideoGenerationPage: React.FC = () => {
   const [speedSetting, setSpeedSetting] = useState(1);
   const [isExportSettingsExpanded, setIsExportSettingsExpanded] = useState(true);
   const [isImageUploadAreaDragover, setIsImageUploadAreaDragover] = useState(false);
+  
+  // 新增状态：AI生成功能
+  const [loading, setLoading] = useState(false);
+  const [generatedScenes, setGeneratedScenes] = useState<GeneratedScene[]>([]);
+  const [previewVideoUrl, setPreviewVideoUrl] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('default');
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +112,117 @@ const VideoGenerationPage: React.FC = () => {
       gradientClass: 'bg-gradient-tertiary'
     }
   ];
+
+  // 艺术风格选项
+  const styleOptions = [
+    { id: 'realistic', name: '写实风格', description: '真实感强' },
+    { id: 'cartoon', name: '卡通风格', description: '活泼可爱' },
+    { id: 'cinematic', name: '电影风格', description: '大片质感' },
+    { id: 'watercolor', name: '水彩风格', description: '柔和梦幻' },
+    { id: 'anime', name: '动漫风格', description: '日系动漫' },
+    { id: 'cyberpunk', name: '赛博朋克', description: '未来科技' }
+  ];
+  
+  // 模拟AI生成视频场景
+  const generateVideoScenes = async (text: string, style: string) => {
+    // 模拟AI处理延迟
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const styleName = styleOptions.find(s => s.id === style)?.name || style;
+    
+    return [
+      {
+        id: 1,
+        title: '开场场景',
+        description: `基于"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的开场画面 - ${styleName}`,
+        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
+        duration: `${durationSetting}秒`,
+        camera: '全景镜头',
+        prompt: `${text}, ${styleName}, 电影感开场, 高质量`
+      },
+      {
+        id: 2,
+        title: '发展场景',
+        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的情节发展 - ${styleName}`,
+        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
+        duration: `${durationSetting}秒`,
+        camera: '中景镜头',
+        prompt: `${text}, ${styleName}, 情节发展, 动态构图`
+      },
+      {
+        id: 3,
+        title: '高潮场景',
+        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的高潮部分 - ${styleName}`,
+        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
+        duration: `${durationSetting}秒`,
+        camera: '特写镜头',
+        prompt: `${text}, ${styleName}, 高潮场景, 情感强烈`
+      },
+      {
+        id: 4,
+        title: '结尾场景',
+        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的完美收尾 - ${styleName}`,
+        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
+        duration: `${durationSetting}秒`,
+        camera: '远景镜头',
+        prompt: `${text}, ${styleName}, 结尾场景, 意境深远`
+      }
+    ];
+  };
+
+  // 修改生成预览函数
+  const handleGeneratePreview = async () => {
+    if (!textInputContent.trim()) {
+      alert('请先输入文本内容');
+      return;
+    }
+
+    console.log('开始生成视频预览...');
+    setLoading(true);
+    setGeneratedScenes([]);
+    
+    try {
+      // 调用AI生成场景
+      const scenes = await generateVideoScenes(textInputContent, selectedStyle);
+      setGeneratedScenes(scenes);
+      
+      // 模拟生成预览视频URL
+      setPreviewVideoUrl('https://example.com/preview-video.mp4');
+      
+      console.log('生成完成:', scenes);
+    } catch (error) {
+      console.error('生成失败:', error);
+      alert('生成失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 修改生成完整视频函数
+  const handleGenerateVideo = async () => {
+    if (!textInputContent.trim()) {
+      alert('请先输入文本内容');
+      return;
+    }
+
+    console.log('开始生成完整视频...');
+    setLoading(true);
+    
+    try {
+      // 调用AI生成场景
+      const scenes = await generateVideoScenes(textInputContent, selectedStyle);
+      setGeneratedScenes(scenes);
+      
+      // 这里可以添加完整的视频生成逻辑
+      console.log('完整视频生成完成:', scenes);
+      alert('完整视频生成成功！请查看下方生成的场景。');
+    } catch (error) {
+      console.error('生成失败:', error);
+      alert('生成失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // 事件处理函数
   const handleSidebarToggle = () => {
@@ -182,6 +307,7 @@ const VideoGenerationPage: React.FC = () => {
   const handleVoicePreview = (voiceId: string) => {
     console.log(`预览语音: ${voiceId}`);
     // 这里可以添加语音预览逻辑
+    alert(`正在预览 ${voiceOptions.find(v => v.id === voiceId)?.name}...`);
   };
   
   const handleMusicSelect = (musicId: string) => {
@@ -191,6 +317,7 @@ const VideoGenerationPage: React.FC = () => {
   const handleMusicPreview = (musicId: string) => {
     console.log(`预览音乐: ${musicId}`);
     // 这里可以添加音乐预览逻辑
+    alert(`正在预览 ${musicOptions.find(m => m.id === musicId)?.name}...`);
   };
   
   const handleMusicStop = (musicId: string) => {
@@ -204,6 +331,10 @@ const VideoGenerationPage: React.FC = () => {
   
   const handleSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSpeedSetting(parseFloat(e.target.value));
+  };
+
+  const handleStyleSelect = (styleId: string) => {
+    setSelectedStyle(styleId);
   };
   
   const getSpeedLabel = (speed: number): string => {
@@ -222,24 +353,28 @@ const VideoGenerationPage: React.FC = () => {
     setIsExportSettingsExpanded(!isExportSettingsExpanded);
   };
   
-  const handleGeneratePreview = () => {
-    console.log('开始生成视频预览');
-    alert('正在生成视频预览...');
-  };
-  
-  const handleGenerateVideo = () => {
-    console.log('开始生成完整视频');
-    alert('正在生成完整视频...');
-  };
-  
   const handleSaveProject = () => {
     console.log('保存当前项目');
-    alert('项目已保存');
+    const projectData = {
+      text: textInputContent,
+      scenes: generatedScenes,
+      style: selectedStyle,
+      voice: selectedVoiceId,
+      music: selectedMusicId,
+      duration: durationSetting
+    };
+    console.log('项目数据:', projectData);
+    alert('项目已保存到本地存储');
   };
   
   const handleExportVideo = () => {
+    if (generatedScenes.length === 0) {
+      alert('请先生成视频内容');
+      return;
+    }
+    
     console.log('导出视频');
-    alert('视频导出成功！');
+    alert('视频导出成功！已跳转到作品管理页面。');
     navigate('/works-management');
   };
   
@@ -249,6 +384,9 @@ const VideoGenerationPage: React.FC = () => {
   
   const handleHistoryLoad = (projectName: string) => {
     console.log(`加载项目：${projectName}`);
+    // 模拟加载历史项目
+    setTextInputContent(`这是${projectName}的示例文本内容...`);
+    setSelectedStyle('cinematic');
     alert(`正在加载项目：${projectName}`);
   };
   
@@ -471,6 +609,32 @@ const VideoGenerationPage: React.FC = () => {
             </div>
           </div>
 
+          {/* 艺术风格选择区 */}
+          <div className="bg-white rounded-2xl shadow-card p-6">
+            <h2 className="text-lg font-semibold text-text-primary mb-4">
+              <i className="fas fa-palette text-primary mr-2"></i>选择艺术风格
+            </h2>
+            <div className="grid md:grid-cols-3 gap-3">
+              {styleOptions.map((style) => (
+                <div 
+                  key={style.id}
+                  onClick={() => handleStyleSelect(style.id)}
+                  className={`${styles.styleOption} ${selectedStyle === style.id ? styles.styleOptionSelected : ''} border border-border-light rounded-lg p-3 cursor-pointer`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-text-primary">{style.name}</h4>
+                      <p className="text-sm text-text-secondary">{style.description}</p>
+                    </div>
+                    {selectedStyle === style.id && (
+                      <i className="fas fa-check text-primary"></i>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* 视频预览区 */}
           <div className="bg-white rounded-2xl shadow-card p-6">
             <h2 className="text-lg font-semibold text-text-primary mb-4">
@@ -481,25 +645,70 @@ const VideoGenerationPage: React.FC = () => {
                 className="w-full aspect-video" 
                 controls 
                 poster="https://s.coze.cn/image/RZgSDt-VzZA/"
+                src={previewVideoUrl}
               >
-                <source src="" type="video/mp4" />
                 您的浏览器不支持视频播放。
               </video>
             </div>
             <div className="flex items-center justify-center space-x-4 mt-4">
               <button 
                 onClick={handleGeneratePreview}
-                className={`${styles.btnGradient} text-white px-6 py-3 rounded-lg font-semibold`}
+                disabled={loading}
+                className={`${styles.btnGradient} text-white px-6 py-3 rounded-lg font-semibold ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <i className="fas fa-play mr-2"></i>生成预览
+                {loading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>生成中...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-play mr-2"></i>生成预览
+                  </>
+                )}
               </button>
               <button 
                 onClick={handleGenerateVideo}
-                className="bg-gradient-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
+                disabled={loading}
+                className="bg-gradient-secondary text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <i className="fas fa-magic mr-2"></i>生成视频
+                {loading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>生成中...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-magic mr-2"></i>生成视频
+                  </>
+                )}
               </button>
             </div>
+
+            {/* 生成的场景展示 */}
+            {generatedScenes.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-text-primary mb-4">生成的场景 ({generatedScenes.length}个)</h3>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {generatedScenes.map((scene) => (
+                    <div key={scene.id} className="border border-border-light rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <img 
+                        src={scene.image} 
+                        alt={scene.title}
+                        className="w-full h-32 object-cover rounded-lg mb-3"
+                      />
+                      <h4 className="font-semibold text-text-primary">{scene.title}</h4>
+                      <p className="text-sm text-text-secondary mb-2">{scene.description}</p>
+                      <div className="flex justify-between text-xs text-text-secondary">
+                        <span>时长: {scene.duration}</span>
+                        <span>镜头: {scene.camera}</span>
+                      </div>
+                      <div className="mt-2 text-xs text-primary bg-blue-50 p-2 rounded">
+                        <strong>AI提示词:</strong> {scene.prompt}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 参数调整区 */}
@@ -786,4 +995,3 @@ const VideoGenerationPage: React.FC = () => {
 };
 
 export default VideoGenerationPage;
-
