@@ -57,7 +57,7 @@ const VideoGenerationPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [generatedScenes, setGeneratedScenes] = useState<GeneratedScene[]>([]);
   const [previewVideoUrl, setPreviewVideoUrl] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState('default');
+  const [selectedStyle, setSelectedStyle] = useState('realistic');
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,61 +113,135 @@ const VideoGenerationPage: React.FC = () => {
     }
   ];
 
-  // 艺术风格选项
+  // 艺术风格选项 - 增强版
   const styleOptions = [
-    { id: 'realistic', name: '写实风格', description: '真实感强' },
-    { id: 'cartoon', name: '卡通风格', description: '活泼可爱' },
-    { id: 'cinematic', name: '电影风格', description: '大片质感' },
-    { id: 'watercolor', name: '水彩风格', description: '柔和梦幻' },
-    { id: 'anime', name: '动漫风格', description: '日系动漫' },
-    { id: 'cyberpunk', name: '赛博朋克', description: '未来科技' }
+    { 
+      id: 'realistic', 
+      name: '写实风格', 
+      description: '真实感强，细节丰富',
+      color: 'from-blue-500 to-blue-700'
+    },
+    { 
+      id: 'cartoon', 
+      name: '卡通风格', 
+      description: '色彩鲜艳，线条简洁',
+      color: 'from-yellow-400 to-orange-500'
+    },
+    { 
+      id: 'cinematic', 
+      name: '电影风格', 
+      description: '大片质感，光影强烈',
+      color: 'from-purple-600 to-pink-600'
+    },
+    { 
+      id: 'watercolor', 
+      name: '水彩风格', 
+      description: '柔和梦幻，色彩渐变',
+      color: 'from-green-400 to-cyan-500'
+    },
+    { 
+      id: 'anime', 
+      name: '动漫风格', 
+      description: '日系动漫，大眼睛',
+      color: 'from-pink-400 to-rose-500'
+    },
+    { 
+      id: 'cyberpunk', 
+      name: '赛博朋克', 
+      description: '未来科技，霓虹灯光',
+      color: 'from-cyan-400 to-blue-600'
+    }
   ];
-  
-  // 模拟AI生成视频场景
+
+  // 辅助函数：将文本分割为4个场景
+  const splitTextForScenes = (text: string): string[] => {
+    const words = text.split(/\s+/).filter(word => word.trim().length > 0);
+    
+    if (words.length === 0) {
+      return ['开场内容', '发展内容', '高潮内容', '结尾内容'];
+    }
+    
+    const segmentLength = Math.ceil(words.length / 4);
+    const segments = [];
+    
+    for (let i = 0; i < 4; i++) {
+      const start = i * segmentLength;
+      const end = Math.min(start + segmentLength, words.length);
+      const segment = words.slice(start, end).join(' ');
+      segments.push(segment || `场景内容 ${i + 1}`);
+    }
+    
+    return segments;
+  };
+
+  // 优化图片URL生成函数
+  const generateDynamicImageUrl = (text: string, style: string, sceneType: string, index: number): string => {
+    const baseSeed = encodeURIComponent(text.substring(0, 20) + style + sceneType + index);
+    const timestamp = Date.now();
+    return `https://picsum.photos/seed/${baseSeed}-${timestamp}/400/300`;
+  };
+
+  // 模拟AI生成视频场景 - 动态版
   const generateVideoScenes = async (text: string, style: string) => {
     // 模拟AI处理延迟
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const styleName = styleOptions.find(s => s.id === style)?.name || style;
+    const styleInfo = styleOptions.find(s => s.id === style) || styleOptions[0];
+    const textSegments = splitTextForScenes(text);
     
-    return [
-      {
-        id: 1,
-        title: '开场场景',
-        description: `基于"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的开场画面 - ${styleName}`,
-        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
-        duration: `${durationSetting}秒`,
+    // 场景配置
+    const sceneConfigs = [
+      { 
+        id: 1, 
+        title: '开场', 
         camera: '全景镜头',
-        prompt: `${text}, ${styleName}, 电影感开场, 高质量`
+        type: 'opening'
       },
-      {
-        id: 2,
-        title: '发展场景',
-        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的情节发展 - ${styleName}`,
-        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
-        duration: `${durationSetting}秒`,
+      { 
+        id: 2, 
+        title: '发展', 
         camera: '中景镜头',
-        prompt: `${text}, ${styleName}, 情节发展, 动态构图`
+        type: 'development'
       },
-      {
-        id: 3,
-        title: '高潮场景',
-        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的高潮部分 - ${styleName}`,
-        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
-        duration: `${durationSetting}秒`,
+      { 
+        id: 3, 
+        title: '高潮', 
         camera: '特写镜头',
-        prompt: `${text}, ${styleName}, 高潮场景, 情感强烈`
+        type: 'climax'
       },
-      {
-        id: 4,
-        title: '结尾场景',
-        description: `"${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"的完美收尾 - ${styleName}`,
-        image: 'https://s.coze.cn/image/RZgSDt-VzZA/',
-        duration: `${durationSetting}秒`,
+      { 
+        id: 4, 
+        title: '结尾', 
         camera: '远景镜头',
-        prompt: `${text}, ${styleName}, 结尾场景, 意境深远`
+        type: 'ending'
       }
     ];
+    
+    return sceneConfigs.map((config, index) => {
+      const segmentText = textSegments[index];
+      const previewText = segmentText.length > 15 
+        ? `${segmentText.substring(0, 15)}...` 
+        : segmentText;
+      
+      // 生成动态图片URL
+      const imageUrl = generateDynamicImageUrl(text, style, config.type, index);
+      
+      return {
+        id: config.id,
+        title: `${styleInfo.name}${config.title}`,
+        description: `"${previewText}"`,
+        image: imageUrl,
+        duration: `${durationSetting}秒`,
+        camera: config.camera,
+        prompt: `【${config.title}】${segmentText} | 风格:${styleInfo.name} | 镜头:${config.camera}`
+      };
+    });
+  };
+
+  // 图片错误处理函数
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, sceneId: number) => {
+    const target = e.target as HTMLImageElement;
+    target.src = `https://picsum.photos/seed/fallback-${sceneId}-${Date.now()}/400/300`;
   };
 
   // 修改生成预览函数
@@ -614,22 +688,27 @@ const VideoGenerationPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-text-primary mb-4">
               <i className="fas fa-palette text-primary mr-2"></i>选择艺术风格
             </h2>
-            <div className="grid md:grid-cols-3 gap-3">
+            <div className="grid md:grid-cols-3 gap-4">
               {styleOptions.map((style) => (
                 <div 
                   key={style.id}
                   onClick={() => handleStyleSelect(style.id)}
-                  className={`${styles.styleOption} ${selectedStyle === style.id ? styles.styleOptionSelected : ''} border border-border-light rounded-lg p-3 cursor-pointer`}
+                  className={`${styles.styleOption} ${
+                    selectedStyle === style.id ? styles.styleOptionSelected : ''
+                  } border-2 ${
+                    selectedStyle === style.id ? 'border-primary' : 'border-border-light'
+                  } rounded-xl p-4 cursor-pointer transition-all duration-200 hover:shadow-md`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-text-primary">{style.name}</h4>
-                      <p className="text-sm text-text-secondary">{style.description}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${style.color}`}></div>
+                      <h4 className="font-semibold text-text-primary">{style.name}</h4>
                     </div>
                     {selectedStyle === style.id && (
-                      <i className="fas fa-check text-primary"></i>
+                      <i className="fas fa-check text-primary text-lg"></i>
                     )}
                   </div>
+                  <p className="text-sm text-text-secondary pl-7">{style.description}</p>
                 </div>
               ))}
             </div>
@@ -685,24 +764,38 @@ const VideoGenerationPage: React.FC = () => {
 
             {/* 生成的场景展示 */}
             {generatedScenes.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold text-text-primary mb-4">生成的场景 ({generatedScenes.length}个)</h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="mt-8">
+                <h3 className="text-xl font-bold text-text-primary mb-6 border-b pb-2">
+                  生成的视频场景 ({generatedScenes.length}个)
+                  <span className="text-sm font-normal text-primary ml-2">
+                    {styleOptions.find(s => s.id === selectedStyle)?.name}风格
+                  </span>
+                </h3>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {generatedScenes.map((scene) => (
-                    <div key={scene.id} className="border border-border-light rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <img 
-                        src={scene.image} 
-                        alt={scene.title}
-                        className="w-full h-32 object-cover rounded-lg mb-3"
-                      />
-                      <h4 className="font-semibold text-text-primary">{scene.title}</h4>
-                      <p className="text-sm text-text-secondary mb-2">{scene.description}</p>
-                      <div className="flex justify-between text-xs text-text-secondary">
-                        <span>时长: {scene.duration}</span>
-                        <span>镜头: {scene.camera}</span>
+                    <div 
+                      key={scene.id} 
+                      className="border-2 border-border-light rounded-xl p-4 hover:shadow-lg transition-all duration-300 bg-white"
+                    >
+                      <div className="relative group">
+                        <img 
+                          src={scene.image} 
+                          alt={scene.title}
+                          className="w-full h-40 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => handleImageError(e, scene.id)}
+                        />
+                        <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                          {scene.duration}
+                        </div>
                       </div>
-                      <div className="mt-2 text-xs text-primary bg-blue-50 p-2 rounded">
-                        <strong>AI提示词:</strong> {scene.prompt}
+                      <h4 className="font-bold text-text-primary text-sm mb-2">{scene.title}</h4>
+                      <p className="text-xs text-text-secondary mb-3 line-clamp-2">{scene.description}</p>
+                      <div className="flex justify-between text-xs text-text-secondary mb-3">
+                        <span className="bg-gray-100 px-2 py-1 rounded">📷 {scene.camera}</span>
+                      </div>
+                      <div className="mt-2 text-xs text-primary bg-blue-50 p-2 rounded-lg border border-blue-100">
+                        <strong className="text-blue-700">AI提示词:</strong> 
+                        <div className="mt-1 text-gray-700">{scene.prompt}</div>
                       </div>
                     </div>
                   ))}
