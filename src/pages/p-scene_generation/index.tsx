@@ -91,11 +91,61 @@ const SceneGenerationPage: React.FC = () => {
     return segments;
   };
 
-  // 生成动态图片URL
+  // 从文本中提取关键词
+  const extractKeywords = (text: string): string[] => {
+    const commonWords = ['的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'];
+    
+    const words = text.split('').filter(char => 
+      char.trim() && !commonWords.includes(char)
+    );
+    
+    // 取前10个非通用词作为关键词
+    return [...new Set(words)].slice(0, 10);
+  };
+
+  // 生成动态图片URL - 改进版
   const generateDynamicImageUrl = (text: string, style: string, frameIndex: number): string => {
-    const baseSeed = encodeURIComponent(text.substring(0, 20) + style + frameIndex);
-    const timestamp = Date.now();
-    return `https://picsum.photos/seed/${baseSeed}-${timestamp}/400/300`;
+    // 基于文本内容生成更相关的关键词
+    const keywords = extractKeywords(text);
+    const styleKeywords = {
+      anime: 'anime,manga,japanese',
+      chinese: 'chinese,traditional,ancient',
+      realistic: 'realistic,photo,detailed',
+      scifi: 'scifi,futuristic,technology',
+      watercolor: 'watercolor,painting,artistic',
+      sketch: 'sketch,drawing,blackwhite'
+    };
+    
+    const baseKeyword = keywords[frameIndex % keywords.length] || 'scene';
+    const styleKeyword = styleKeywords[style as keyof typeof styleKeywords] || 'art';
+    
+    const seed = encodeURIComponent(`${baseKeyword}-${styleKeyword}-${frameIndex}-${Date.now()}`);
+    return `https://picsum.photos/seed/${seed}/400/300`;
+  };
+
+  // 改进场景描述生成
+  const generateSceneDescription = (text: string, style: string, index: number): string => {
+    const styleNames = {
+      anime: '日漫',
+      chinese: '古风', 
+      realistic: '写实',
+      scifi: '科幻',
+      watercolor: '水彩',
+      sketch: '素描'
+    };
+    
+    const sceneTypes = [
+      '特写镜头', '中景画面', '全景场景', '细节展示',
+      '情节推进', '氛围营造', '人物互动', '环境描写'
+    ];
+    
+    const styleName = styleNames[style as keyof typeof styleNames] || '写实';
+    const sceneType = sceneTypes[index % sceneTypes.length];
+    
+    // 从文本中提取相关内容
+    const content = text.length > 20 ? `${text.substring(0, 20)}...` : text;
+    
+    return `${styleName}风格 - ${sceneType}：${content}`;
   };
 
   // 处理侧边栏切换
@@ -154,23 +204,19 @@ const SceneGenerationPage: React.FC = () => {
     }, 800);
   };
 
-  // 生成动态分镜帧 - 修复版
+  // 生成动态分镜帧 - 改进版
   const generateSceneFrames = () => {
     const newFrames: SceneFrame[] = [];
     const count = parseInt(frameCount);
     const textSegments = splitTextForScenes(textInputValue, count);
-    const selectedStyle = artStyles.find(style => style.id === selectedArtStyle)?.name || selectedArtStyle;
     
     for (let i = 0; i < count; i++) {
       const segmentText = textSegments[i];
-      const previewText = segmentText.length > 15 
-        ? `${segmentText.substring(0, 15)}...` 
-        : segmentText;
       
       newFrames.push({
         id: i,
         imageUrl: generateDynamicImageUrl(textInputValue, selectedArtStyle, i),
-        description: `${selectedStyle}风格 - ${previewText}`
+        description: generateSceneDescription(segmentText, selectedArtStyle, i)
       });
     }
     
