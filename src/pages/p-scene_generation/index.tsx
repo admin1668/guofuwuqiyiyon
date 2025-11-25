@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styles from './styles.module.css';
@@ -72,15 +70,33 @@ const SceneGenerationPage: React.FC = () => {
     { value: 100, text: '生成完成！' }
   ];
 
-  // 示例分镜图片
-  const sampleImages = [
-    'https://s.coze.cn/image/15A_Eo27QlE/',
-    'https://s.coze.cn/image/wOCuJaVgyvU/',
-    'https://s.coze.cn/image/5B1-VBaFyY8/',
-    'https://s.coze.cn/image/3HrMMAmaiYI/',
-    'https://s.coze.cn/image/bmIRdN-y-e0/',
-    'https://s.coze.cn/image/U0L60H4TqPU/'
-  ];
+  // 辅助函数：将文本分割为多个场景描述
+  const splitTextForScenes = (text: string, count: number): string[] => {
+    const words = text.split(/\s+/).filter(word => word.trim().length > 0);
+    
+    if (words.length === 0) {
+      return Array(count).fill('').map((_, i) => `场景描述 ${i + 1}`);
+    }
+    
+    const segmentLength = Math.ceil(words.length / count);
+    const segments = [];
+    
+    for (let i = 0; i < count; i++) {
+      const start = i * segmentLength;
+      const end = Math.min(start + segmentLength, words.length);
+      const segment = words.slice(start, end).join(' ');
+      segments.push(segment || `场景内容 ${i + 1}`);
+    }
+    
+    return segments;
+  };
+
+  // 生成动态图片URL
+  const generateDynamicImageUrl = (text: string, style: string, frameIndex: number): string => {
+    const baseSeed = encodeURIComponent(text.substring(0, 20) + style + frameIndex);
+    const timestamp = Date.now();
+    return `https://picsum.photos/seed/${baseSeed}-${timestamp}/400/300`;
+  };
 
   // 处理侧边栏切换
   const handleSidebarToggle = () => {
@@ -138,20 +154,33 @@ const SceneGenerationPage: React.FC = () => {
     }, 800);
   };
 
-  // 生成示例分镜帧
+  // 生成动态分镜帧 - 修复版
   const generateSceneFrames = () => {
     const newFrames: SceneFrame[] = [];
     const count = parseInt(frameCount);
+    const textSegments = splitTextForScenes(textInputValue, count);
+    const selectedStyle = artStyles.find(style => style.id === selectedArtStyle)?.name || selectedArtStyle;
     
     for (let i = 0; i < count; i++) {
+      const segmentText = textSegments[i];
+      const previewText = segmentText.length > 15 
+        ? `${segmentText.substring(0, 15)}...` 
+        : segmentText;
+      
       newFrames.push({
         id: i,
-        imageUrl: sampleImages[i % sampleImages.length],
-        description: `分镜画面 ${i + 1}`
+        imageUrl: generateDynamicImageUrl(textInputValue, selectedArtStyle, i),
+        description: `${selectedStyle}风格 - ${previewText}`
       });
     }
     
     setSceneFrames(newFrames);
+  };
+
+  // 图片错误处理
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, frameId: number) => {
+    const target = e.target as HTMLImageElement;
+    target.src = `https://picsum.photos/seed/fallback-${frameId}-${Date.now()}/400/300`;
   };
 
   // 预览分镜
@@ -564,6 +593,7 @@ const SceneGenerationPage: React.FC = () => {
                         src={frame.imageUrl}
                         alt={`分镜画面 ${index + 1}`}
                         className="w-full h-48 object-cover"
+                        onError={(e) => handleImageError(e, frame.id)}
                       />
                       <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
                         {index + 1}
@@ -661,4 +691,3 @@ const SceneGenerationPage: React.FC = () => {
 };
 
 export default SceneGenerationPage;
-
