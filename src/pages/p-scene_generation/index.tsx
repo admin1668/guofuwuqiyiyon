@@ -6,6 +6,7 @@ interface SceneFrame {
   id: number;
   imageUrl: string;
   description: string;
+  prompt: string;
 }
 
 interface ProgressStep {
@@ -21,9 +22,7 @@ const SceneGenerationPage: React.FC = () => {
   const [textInputValue, setTextInputValue] = useState('');
   const [selectedArtStyle, setSelectedArtStyle] = useState('anime');
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
-  const [frameCount, setFrameCount] = useState('6');
-  const [resolution, setResolution] = useState('720p');
-  const [aspectRatio, setAspectRatio] = useState('16:9');
+  const [frameCount, setFrameCount] = useState('4');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [progressText, setProgressText] = useState('正在分析文本内容...');
@@ -33,144 +32,81 @@ const SceneGenerationPage: React.FC = () => {
   
   const progressIntervalRef = useRef<number | null>(null);
 
-  // 设置页面标题
-  useEffect(() => {
-    const originalTitle = document.title;
-    document.title = '视频分镜生成 - 漫影叙';
-    return () => {
-      document.title = originalTitle;
-    };
-  }, []);
-
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, []);
-
   // 艺术风格选项
   const artStyles = [
-    { id: 'anime', name: '日漫', imageUrl: 'https://s.coze.cn/image/Edn4X_2_9KE/' },
-    { id: 'chinese', name: '古风', imageUrl: 'https://s.coze.cn/image/vIsLuD9QTzs/' },
-    { id: 'realistic', name: '写实', imageUrl: 'https://s.coze.cn/image/0-p7scrE--w/' },
-    { id: 'scifi', name: '科幻', imageUrl: 'https://s.coze.cn/image/aMJr72y7NUU/' },
-    { id: 'watercolor', name: '水彩', imageUrl: 'https://s.coze.cn/image/-86uSxZJklk/' },
-    { id: 'sketch', name: '素描', imageUrl: 'https://s.coze.cn/image/oPvnJVlJocQ/' }
+    { id: 'anime', name: '日漫', color: 'from-pink-400 to-rose-500' },
+    { id: 'chinese', name: '古风', color: 'from-yellow-400 to-orange-500' },
+    { id: 'realistic', name: '写实', color: 'from-blue-500 to-blue-700' },
+    { id: 'scifi', name: '科幻', color: 'from-purple-500 to-indigo-600' },
+    { id: 'watercolor', name: '水彩', color: 'from-green-400 to-cyan-500' },
+    { id: 'sketch', name: '素描', color: 'from-gray-400 to-gray-600' }
   ];
 
-  // 生成进度步骤
-  const progressSteps: ProgressStep[] = [
-    { value: 20, text: '正在分析文本内容...' },
-    { value: 40, text: '正在提取关键元素...' },
-    { value: 60, text: '正在生成画面构图...' },
-    { value: 80, text: '正在渲染分镜画面...' },
-    { value: 100, text: '生成完成！' }
-  ];
-
-  // 辅助函数：将文本分割为多个场景描述
-  const splitTextForScenes = (text: string, count: number): string[] => {
-    const words = text.split(/\s+/).filter(word => word.trim().length > 0);
+  // 模拟AI生成图像 - 使用更相关的图片服务
+  const simulateAIImageGeneration = (text: string, style: string, frameIndex: number): string => {
+    // 基于文本内容生成更相关的图片
+    const keywords = extractKeywords(text);
+    const baseKeyword = keywords[frameIndex % keywords.length] || 'story';
     
-    if (words.length === 0) {
-      return Array(count).fill('').map((_, i) => `场景描述 ${i + 1}`);
-    }
+    const styleThemes = {
+      anime: 'anime,illustration,cartoon',
+      chinese: 'chinese,traditional,painting',
+      realistic: 'realistic,photo,detailed',
+      scifi: 'scifi,future,technology',
+      watercolor: 'watercolor,painting,art',
+      sketch: 'sketch,drawing,art'
+    };
     
-    const segmentLength = Math.ceil(words.length / count);
-    const segments = [];
+    const styleTheme = styleThemes[style as keyof typeof styleThemes] || 'art';
     
-    for (let i = 0; i < count; i++) {
-      const start = i * segmentLength;
-      const end = Math.min(start + segmentLength, words.length);
-      const segment = words.slice(start, end).join(' ');
-      segments.push(segment || `场景内容 ${i + 1}`);
-    }
+    // 使用不同的图片服务来获得更多样化的图片
+    const services = [
+      () => `https://picsum.photos/seed/${encodeURIComponent(text + style + frameIndex)}/512/512`,
+      () => `https://source.unsplash.com/512x512/?${encodeURIComponent(baseKeyword)}`,
+      () => `https://picsum.photos/512/512?random=${Date.now() + frameIndex}`
+    ];
     
-    return segments;
+    const serviceIndex = frameIndex % services.length;
+    return services[serviceIndex]();
   };
 
   // 从文本中提取关键词
   const extractKeywords = (text: string): string[] => {
+    // 移除常见虚词
     const commonWords = ['的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'];
     
+    // 提取有意义的词汇
     const words = text.split('').filter(char => 
-      char.trim() && !commonWords.includes(char)
+      char.trim() && char.length === 1 && !commonWords.includes(char)
     );
     
-    // 取前10个非通用词作为关键词
     return [...new Set(words)].slice(0, 10);
   };
 
-  // 生成动态图片URL - 改进版
-  const generateDynamicImageUrl = (text: string, style: string, frameIndex: number): string => {
-    // 基于文本内容生成更相关的关键词
-    const keywords = extractKeywords(text);
-    const styleKeywords = {
-      anime: 'anime,manga,japanese',
-      chinese: 'chinese,traditional,ancient',
-      realistic: 'realistic,photo,detailed',
-      scifi: 'scifi,futuristic,technology',
-      watercolor: 'watercolor,painting,artistic',
-      sketch: 'sketch,drawing,blackwhite'
-    };
-    
-    const baseKeyword = keywords[frameIndex % keywords.length] || 'scene';
-    const styleKeyword = styleKeywords[style as keyof typeof styleKeywords] || 'art';
-    
-    const seed = encodeURIComponent(`${baseKeyword}-${styleKeyword}-${frameIndex}-${Date.now()}`);
-    return `https://picsum.photos/seed/${seed}/400/300`;
-  };
-
-  // 改进场景描述生成
-  const generateSceneDescription = (text: string, style: string, index: number): string => {
+  // 生成AI提示词
+  const generateAIPrompt = (text: string, style: string, frameIndex: number): string => {
     const styleNames = {
-      anime: '日漫',
-      chinese: '古风', 
-      realistic: '写实',
-      scifi: '科幻',
-      watercolor: '水彩',
-      sketch: '素描'
+      anime: '日漫风格',
+      chinese: '古风风格', 
+      realistic: '写实风格',
+      scifi: '科幻风格',
+      watercolor: '水彩风格',
+      sketch: '素描风格'
     };
     
     const sceneTypes = [
-      '特写镜头', '中景画面', '全景场景', '细节展示',
-      '情节推进', '氛围营造', '人物互动', '环境描写'
+      '特写镜头',
+      '中景画面', 
+      '全景场景',
+      '细节展示',
+      '情节推进',
+      '氛围营造'
     ];
     
-    const styleName = styleNames[style as keyof typeof styleNames] || '写实';
-    const sceneType = sceneTypes[index % sceneTypes.length];
+    const styleName = styleNames[style as keyof typeof styleNames] || '写实风格';
+    const sceneType = sceneTypes[frameIndex % sceneTypes.length];
     
-    // 从文本中提取相关内容
-    const content = text.length > 20 ? `${text.substring(0, 20)}...` : text;
-    
-    return `${styleName}风格 - ${sceneType}：${content}`;
-  };
-
-  // 处理侧边栏切换
-  const handleSidebarToggle = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
-  // 处理文本输入
-  const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setTextInputValue(e.target.value);
-  };
-
-  // 清空文本
-  const handleClearText = () => {
-    setTextInputValue('');
-  };
-
-  // 选择艺术风格
-  const handleStyleSelect = (styleId: string) => {
-    setSelectedArtStyle(styleId);
-  };
-
-  // 切换设置展开状态
-  const handleSettingsToggle = () => {
-    setIsSettingsExpanded(!isSettingsExpanded);
+    return `${styleName} - ${sceneType}：${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`;
   };
 
   // 生成分镜
@@ -184,52 +120,110 @@ const SceneGenerationPage: React.FC = () => {
     setIsGenerating(true);
     setGenerationProgress(0);
     setProgressText('正在分析文本内容...');
+    setSceneFrames([]);
 
     let currentStep = 0;
+    const totalSteps = 5;
+    
     progressIntervalRef.current = window.setInterval(() => {
-      if (currentStep < progressSteps.length) {
-        setGenerationProgress(progressSteps[currentStep].value);
-        setProgressText(progressSteps[currentStep].text);
+      if (currentStep < totalSteps) {
+        const progress = (currentStep + 1) * 20;
+        setGenerationProgress(progress);
+        
+        const steps = [
+          '正在分析文本内容...',
+          '正在提取关键元素...',
+          '正在构思画面构图...',
+          '正在生成分镜画面...',
+          '正在优化图像质量...'
+        ];
+        setProgressText(steps[currentStep]);
         currentStep++;
       } else {
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
           progressIntervalRef.current = null;
         }
-        setTimeout(() => {
-          setIsGenerating(false);
-          generateSceneFrames();
-        }, 500);
+        
+        // 生成分镜
+        generateSceneFrames();
+        setIsGenerating(false);
       }
     }, 800);
   };
 
-  // 生成动态分镜帧 - 改进版
+  // 生成分镜帧
   const generateSceneFrames = () => {
-    const newFrames: SceneFrame[] = [];
     const count = parseInt(frameCount);
-    const textSegments = splitTextForScenes(textInputValue, count);
+    const newFrames: SceneFrame[] = [];
+    
+    // 将文本分割为多个部分
+    const segments = splitTextForScenes(textInputValue, count);
     
     for (let i = 0; i < count; i++) {
-      const segmentText = textSegments[i];
+      const segmentText = segments[i];
+      const prompt = generateAIPrompt(segmentText, selectedArtStyle, i);
+      const imageUrl = simulateAIImageGeneration(segmentText, selectedArtStyle, i);
       
       newFrames.push({
         id: i,
-        imageUrl: generateDynamicImageUrl(textInputValue, selectedArtStyle, i),
-        description: generateSceneDescription(segmentText, selectedArtStyle, i)
+        imageUrl: imageUrl,
+        description: `${artStyles.find(s => s.id === selectedArtStyle)?.name || '写实'}风格 - ${segmentText.substring(0, 15)}${segmentText.length > 15 ? '...' : ''}`,
+        prompt: prompt
       });
     }
     
     setSceneFrames(newFrames);
   };
 
+  // 将文本分割为场景
+  const splitTextForScenes = (text: string, count: number): string[] => {
+    const sentences = text.split(/[。！？.!?]/).filter(s => s.trim().length > 0);
+    
+    if (sentences.length === 0) {
+      return Array(count).fill('').map((_, i) => `场景内容 ${i + 1}`);
+    }
+    
+    const segments = [];
+    const sentencesPerSegment = Math.ceil(sentences.length / count);
+    
+    for (let i = 0; i < count; i++) {
+      const start = i * sentencesPerSegment;
+      const end = Math.min(start + sentencesPerSegment, sentences.length);
+      const segment = sentences.slice(start, end).join('。');
+      segments.push(segment || `分镜描述 ${i + 1}`);
+    }
+    
+    return segments;
+  };
+
   // 图片错误处理
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, frameId: number) => {
     const target = e.target as HTMLImageElement;
-    target.src = `https://picsum.photos/seed/fallback-${frameId}-${Date.now()}/400/300`;
+    target.src = `https://picsum.photos/512/512?random=fallback-${frameId}`;
   };
 
-  // 预览分镜
+  // 其他函数保持不变...
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTextInputValue(e.target.value);
+  };
+
+  const handleClearText = () => {
+    setTextInputValue('');
+  };
+
+  const handleStyleSelect = (styleId: string) => {
+    setSelectedArtStyle(styleId);
+  };
+
+  const handleSettingsToggle = () => {
+    setIsSettingsExpanded(!isSettingsExpanded);
+  };
+
   const handlePreviewScene = () => {
     if (sceneFrames.length === 0) {
       alert('请先生成分镜');
@@ -238,7 +232,6 @@ const SceneGenerationPage: React.FC = () => {
     alert('分镜预览功能');
   };
 
-  // 保存作品
   const handleSave = () => {
     const text = textInputValue.trim();
     if (!text) {
@@ -248,7 +241,6 @@ const SceneGenerationPage: React.FC = () => {
     alert('作品已保存到作品管理');
   };
 
-  // 导出分镜
   const handleExport = () => {
     if (sceneFrames.length === 0) {
       alert('请先生成分镜');
@@ -257,7 +249,6 @@ const SceneGenerationPage: React.FC = () => {
     setShowExportModal(true);
   };
 
-  // 确认导出
   const handleConfirmExport = () => {
     alert(`分镜已导出为${exportFormat.toUpperCase()}格式`);
     setShowExportModal(false);
@@ -266,55 +257,20 @@ const SceneGenerationPage: React.FC = () => {
     }, 500);
   };
 
-  // 分镜编辑功能
-  const handleEditDetail = () => {
-    alert('分镜细节修改功能');
-  };
-
-  const handleReplaceElement = () => {
-    navigate('/asset-library');
-  };
-
-  const handleChangeStyle = () => {
-    alert('分镜风格调整功能');
-  };
-
-  const handleDeleteFrame = () => {
-    if (sceneFrames.length > 0) {
-      if (confirm('确定要删除选中的分镜吗？')) {
-        const newFrames = sceneFrames.slice(0, -1);
-        setSceneFrames(newFrames);
-      }
-    }
-  };
-
   // 拖拽功能
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, frameId: number) => {
     e.dataTransfer.setData('frameId', frameId.toString());
     const target = e.target as HTMLElement;
-    target.classList.add(styles.dragging);
+    target.classList.add('dragging');
   };
 
   const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    target.classList.remove(styles.dragging);
+    target.classList.remove('dragging');
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-  };
-
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const target = e.target as HTMLElement;
-    if (!target.classList.contains(styles.dragging)) {
-      target.style.borderColor = '#667eea';
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    target.style.borderColor = '#e2e8f0';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetFrameId: number) => {
@@ -329,17 +285,13 @@ const SceneGenerationPage: React.FC = () => {
       [newFrames[draggedIndex], newFrames[targetIndex]] = [newFrames[targetIndex], newFrames[draggedIndex]];
       setSceneFrames(newFrames);
     }
-    
-    const target = e.target as HTMLElement;
-    target.style.borderColor = '#e2e8f0';
   };
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className="min-h-screen bg-gray-50">
       {/* 顶部导航栏 */}
       <header className="fixed top-0 left-0 right-0 bg-white shadow-md z-50 h-16">
         <div className="flex items-center justify-between h-full px-6">
-          {/* 左侧：Logo和产品名称 */}
           <div className="flex items-center space-x-4">
             <button 
               onClick={handleSidebarToggle}
@@ -348,26 +300,24 @@ const SceneGenerationPage: React.FC = () => {
               <i className="fas fa-bars text-gray-600"></i>
             </button>
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <i className="fas fa-video text-white text-lg"></i>
               </div>
-              <h1 className={`text-xl font-bold ${styles.gradientText}`}>漫影叙</h1>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">漫影叙</h1>
             </div>
           </div>
           
-          {/* 中间：主导航 */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/home" className="text-text-secondary hover:text-primary py-1 transition-colors">首页</Link>
-            <Link to="/scene-generation" className="text-primary font-medium border-b-2 border-primary py-1">视频分镜生成</Link>
-            <Link to="/video-generation" className="text-text-secondary hover:text-primary py-1 transition-colors">图文转视频</Link>
-            <Link to="/asset-library" className="text-text-secondary hover:text-primary py-1 transition-colors">素材库</Link>
+            <Link to="/home" className="text-gray-600 hover:text-blue-600 py-1 transition-colors">首页</Link>
+            <Link to="/scene-generation" className="text-blue-600 font-medium border-b-2 border-blue-600 py-1">视频分镜生成</Link>
+            <Link to="/video-generation" className="text-gray-600 hover:text-blue-600 py-1 transition-colors">图文转视频</Link>
+            <Link to="/asset-library" className="text-gray-600 hover:text-blue-600 py-1 transition-colors">素材库</Link>
           </nav>
           
-          {/* 右侧：用户操作区 */}
           <div className="flex items-center space-x-4">
             <button className="p-2 rounded-lg hover:bg-gray-100 relative">
               <i className="fas fa-bell text-gray-600"></i>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-danger rounded-full"></span>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
             </button>
             <div className="flex items-center space-x-3">
               <img 
@@ -376,59 +326,22 @@ const SceneGenerationPage: React.FC = () => {
                 className="w-8 h-8 rounded-full border-2 border-gray-200"
               />
               <span className="hidden md:block text-sm font-medium text-gray-700">创作者</span>
-              <i className="fas fa-chevron-down text-xs text-gray-500"></i>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 左侧菜单 */}
-      <aside className={`fixed left-0 top-16 bottom-0 bg-white shadow-lg z-40 transition-all duration-300 ${sidebarCollapsed ? styles.sidebarCollapsed : styles.sidebarExpanded}`}>
-        <div className="p-4">
-          <nav className="space-y-2">
-            <Link to="/home" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-home text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">首页</span>}
-            </Link>
-            <Link to="/scene-generation" className={`${styles.navItem} ${styles.navItemActive} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-film text-primary text-lg"></i>
-              {!sidebarCollapsed && <span className="text-primary font-medium">视频分镜生成</span>}
-            </Link>
-            <Link to="/video-generation" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-magic text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">图文转视频</span>}
-            </Link>
-            <Link to="/works-management" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-folder text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">作品管理</span>}
-            </Link>
-            <Link to="/asset-library" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-images text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">素材库</span>}
-            </Link>
-            <Link to="/user-center" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-user text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">个人中心</span>}
-            </Link>
-            <Link to="/help-tutorial" className={`${styles.navItem} flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors`}>
-              <i className="fas fa-question-circle text-gray-600 text-lg"></i>
-              {!sidebarCollapsed && <span className="text-gray-700">帮助教程</span>}
-            </Link>
-          </nav>
-        </div>
-      </aside>
-
       {/* 主内容区 */}
-      <main className={`pt-16 min-h-screen transition-all duration-300 ${sidebarCollapsed ? styles.mainContentCollapsed : styles.mainContentExpanded}`}>
+      <main className="pt-16 min-h-screen">
         {/* 页面头部 */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-text-primary">视频分镜生成</h1>
-              <nav className="text-sm text-text-secondary mt-1">
-                <Link to="/home" className="hover:text-primary">首页</Link>
+              <h1 className="text-2xl font-bold text-gray-900">视频分镜生成</h1>
+              <nav className="text-sm text-gray-500 mt-1">
+                <Link to="/home" className="hover:text-blue-600">首页</Link>
                 <span className="mx-2">/</span>
-                <span className="text-text-primary">视频分镜生成</span>
+                <span className="text-gray-700">视频分镜生成</span>
               </nav>
             </div>
             <div className="flex items-center space-x-3">
@@ -440,7 +353,7 @@ const SceneGenerationPage: React.FC = () => {
               </button>
               <button 
                 onClick={handleExport}
-                className={`px-4 py-2 ${styles.btnGradient} text-white rounded-lg`}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all"
               >
                 <i className="fas fa-download mr-2"></i>导出分镜
               </button>
@@ -451,27 +364,27 @@ const SceneGenerationPage: React.FC = () => {
         {/* 主要内容区域 */}
         <div className="p-6 space-y-6">
           {/* 文本输入区 */}
-          <section className="bg-white rounded-2xl shadow-card p-6">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              <i className="fas fa-edit text-primary mr-2"></i>输入文本内容
+          <section className="bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <i className="fas fa-edit text-blue-500 mr-2"></i>输入文本内容
             </h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="text-input" className="block text-sm font-medium text-text-secondary mb-2">
+                <label htmlFor="text-input" className="block text-sm font-medium text-gray-700 mb-2">
                   请输入小说段落或描述性文本：
                 </label>
                 <textarea 
                   id="text-input"
                   value={textInputValue}
                   onChange={handleTextInputChange}
-                  className={`w-full h-48 p-4 border border-gray-300 rounded-lg ${styles.formInputFocus} resize-none`}
+                  className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   placeholder="例如：月光如水，洒在古老的石板街上。一位身着白衣的少女缓缓走来，她的长发在夜风中轻轻飘动..."
                 />
-                <div className="flex items-center justify-between mt-2 text-sm text-text-secondary">
+                <div className="flex items-center justify-between mt-2 text-sm text-gray-500">
                   <span>{textInputValue.length} 字</span>
                   <button 
                     onClick={handleClearText}
-                    className="text-danger hover:underline"
+                    className="text-red-500 hover:underline"
                   >
                     清空
                   </button>
@@ -481,33 +394,35 @@ const SceneGenerationPage: React.FC = () => {
           </section>
 
           {/* 风格选择区 */}
-          <section className="bg-white rounded-2xl shadow-card p-6">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              <i className="fas fa-palette text-primary mr-2"></i>选择艺术风格
+          <section className="bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <i className="fas fa-palette text-blue-500 mr-2"></i>选择艺术风格
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {artStyles.map((style) => (
                 <div 
                   key={style.id}
                   onClick={() => handleStyleSelect(style.id)}
-                  className={`${styles.styleCard} ${selectedArtStyle === style.id ? styles.selected : ''} border-2 border-gray-200 rounded-xl p-3 text-center`}
+                  className={`border-2 rounded-xl p-4 text-center cursor-pointer transition-all ${
+                    selectedArtStyle === style.id 
+                      ? 'border-blue-500 bg-blue-50 shadow-md' 
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
                 >
-                  <img 
-                    src={style.imageUrl}
-                    alt={`${style.name}风格`}
-                    className="w-full h-24 object-cover rounded-lg mb-2"
-                  />
-                  <span className="text-sm font-medium text-text-primary">{style.name}</span>
+                  <div className={`w-12 h-12 mx-auto mb-2 rounded-lg bg-gradient-to-r ${style.color} flex items-center justify-center`}>
+                    <i className="fas fa-paint-brush text-white"></i>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">{style.name}</span>
                 </div>
               ))}
             </div>
           </section>
 
           {/* 生成设置区 */}
-          <section className="bg-white rounded-2xl shadow-card">
+          <section className="bg-white rounded-2xl shadow-lg">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-text-primary">
-                <i className="fas fa-cog text-primary mr-2"></i>生成设置
+              <h2 className="text-lg font-semibold text-gray-900">
+                <i className="fas fa-cog text-blue-500 mr-2"></i>生成设置
               </h2>
               <button 
                 onClick={handleSettingsToggle}
@@ -516,50 +431,21 @@ const SceneGenerationPage: React.FC = () => {
                 <i className={`fas fa-chevron-down transition-transform ${isSettingsExpanded ? 'rotate-180' : ''}`}></i>
               </button>
             </div>
-            <div className={`${styles.collapsibleContent} ${isSettingsExpanded ? styles.expanded : ''}`}>
+            <div className={`overflow-hidden transition-all duration-300 ${isSettingsExpanded ? 'max-h-96' : 'max-h-0'}`}>
               <div className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label htmlFor="frame-count" className="block text-sm font-medium text-text-secondary mb-2">分镜数量</label>
-                    <select 
-                      id="frame-count"
-                      value={frameCount}
-                      onChange={(e) => setFrameCount(e.target.value)}
-                      className={`w-full p-3 border border-gray-300 rounded-lg ${styles.formInputFocus}`}
-                    >
-                      <option value="4">4 帧</option>
-                      <option value="6">6 帧</option>
-                      <option value="8">8 帧</option>
-                      <option value="10">10 帧</option>
-                      <option value="12">12 帧</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="resolution" className="block text-sm font-medium text-text-secondary mb-2">分辨率</label>
-                    <select 
-                      id="resolution"
-                      value={resolution}
-                      onChange={(e) => setResolution(e.target.value)}
-                      className={`w-full p-3 border border-gray-300 rounded-lg ${styles.formInputFocus}`}
-                    >
-                      <option value="1080p">1920x1080 (1080p)</option>
-                      <option value="720p">1280x720 (720p)</option>
-                      <option value="480p">854x480 (480p)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="aspect-ratio" className="block text-sm font-medium text-text-secondary mb-2">宽高比</label>
-                    <select 
-                      id="aspect-ratio"
-                      value={aspectRatio}
-                      onChange={(e) => setAspectRatio(e.target.value)}
-                      className={`w-full p-3 border border-gray-300 rounded-lg ${styles.formInputFocus}`}
-                    >
-                      <option value="16:9">16:9 (宽屏)</option>
-                      <option value="4:3">4:3 (标准)</option>
-                      <option value="1:1">1:1 (正方形)</option>
-                    </select>
-                  </div>
+                <div>
+                  <label htmlFor="frame-count" className="block text-sm font-medium text-gray-700 mb-2">分镜数量</label>
+                  <select 
+                    id="frame-count"
+                    value={frameCount}
+                    onChange={(e) => setFrameCount(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="2">2 帧</option>
+                    <option value="4">4 帧</option>
+                    <option value="6">6 帧</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">建议选择2-4个分镜以获得最佳效果</p>
                 </div>
               </div>
             </div>
@@ -570,56 +456,73 @@ const SceneGenerationPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={handleGenerateScene}
-                className={`${styles.btnGradient} text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg`}
+                disabled={isGenerating}
+                className={`bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all ${
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                <i className="fas fa-magic mr-2"></i>生成分镜
+                {isGenerating ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>AI生成中...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-robot mr-2"></i>AI生成分镜
+                  </>
+                )}
               </button>
               <button 
                 onClick={handlePreviewScene}
-                className="bg-white text-primary border-2 border-primary px-8 py-4 rounded-xl font-semibold text-lg hover:bg-primary hover:text-white transition-all"
+                className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-600 hover:text-white transition-all"
               >
                 <i className="fas fa-eye mr-2"></i>预览分镜
               </button>
             </div>
+            <p className="text-sm text-gray-500 mt-3">
+              ⚡ 智能模拟AI图像生成，根据文本内容创作相关分镜画面
+            </p>
           </section>
 
           {/* 生成进度区 */}
           {isGenerating && (
-            <section className="bg-white rounded-2xl shadow-card p-6">
-              <h2 className="text-lg font-semibold text-text-primary mb-4">
-                <i className="fas fa-spinner fa-spin text-primary mr-2"></i>正在生成分镜...
+            <section className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                <i className="fas fa-robot text-blue-500 mr-2"></i>AI正在生成分镜...
               </h2>
               <div className="space-y-4">
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div 
-                    className={`${styles.progressBar} h-3 rounded-full`}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-300"
                     style={{ width: `${generationProgress}%` }}
                   ></div>
                 </div>
                 <div className="text-center">
-                  <span className="text-text-secondary">{progressText}</span>
+                  <span className="text-gray-600">{progressText}</span>
                 </div>
               </div>
             </section>
           )}
 
           {/* 分镜预览区 */}
-          <section className="bg-white rounded-2xl shadow-card p-6">
+          <section className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-text-primary">
-                <i className="fas fa-images text-primary mr-2"></i>分镜预览
+              <h2 className="text-lg font-semibold text-gray-900">
+                <i className="fas fa-images text-blue-500 mr-2"></i>AI生成分镜
               </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-text-secondary">拖拽调整顺序</span>
-                <i className="fas fa-arrows-alt text-gray-400"></i>
-              </div>
+              {sceneFrames.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">拖拽调整顺序</span>
+                  <i className="fas fa-arrows-alt text-gray-400"></i>
+                </div>
+              )}
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {sceneFrames.length === 0 ? (
-                <div className="bg-gray-100 rounded-xl p-4 text-center border-2 border-dashed border-gray-300">
-                  <i className="fas fa-plus text-4xl text-gray-400 mb-2"></i>
-                  <p className="text-sm text-text-secondary">点击生成分镜</p>
+                <div className="bg-gray-100 rounded-xl p-8 text-center border-2 border-dashed border-gray-300 col-span-2">
+                  <i className="fas fa-robot text-4xl text-gray-400 mb-4"></i>
+                  <p className="text-lg text-gray-500 mb-2">等待AI生成分镜</p>
+                  <p className="text-sm text-gray-400">输入文本内容并选择艺术风格，点击"AI生成分镜"开始创作</p>
                 </div>
               ) : (
                 sceneFrames.map((frame, index) => (
@@ -629,16 +532,14 @@ const SceneGenerationPage: React.FC = () => {
                     onDragStart={(e) => handleDragStart(e, frame.id)}
                     onDragEnd={handleDragEnd}
                     onDragOver={handleDragOver}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, frame.id)}
-                    className={`${styles.sceneFrame} bg-white rounded-xl overflow-hidden shadow-card border-2 border-gray-200 cursor-move`}
+                    className="bg-white rounded-xl overflow-hidden shadow-lg border-2 border-gray-200 cursor-move hover:shadow-xl transition-all"
                   >
                     <div className="relative">
                       <img 
                         src={frame.imageUrl}
                         alt={`分镜画面 ${index + 1}`}
-                        className="w-full h-48 object-cover"
+                        className="w-full h-64 object-cover"
                         onError={(e) => handleImageError(e, frame.id)}
                       />
                       <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
@@ -646,52 +547,18 @@ const SceneGenerationPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="p-4">
-                      <p className="text-sm text-text-secondary">{frame.description}</p>
+                      <p className="text-sm text-gray-600 mb-2">{frame.description}</p>
+                      <div className="bg-blue-50 rounded-lg p-2 mt-2">
+                        <p className="text-xs text-blue-700">
+                          <strong>AI提示词:</strong> {frame.prompt}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
           </section>
-
-          {/* 分镜编辑工具栏 */}
-          {sceneFrames.length > 0 && (
-            <section className="bg-white rounded-2xl shadow-card p-6">
-              <h2 className="text-lg font-semibold text-text-primary mb-4">
-                <i className="fas fa-tools text-primary mr-2"></i>分镜编辑
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button 
-                  onClick={handleEditDetail}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all text-center"
-                >
-                  <i className="fas fa-edit text-2xl text-primary mb-2"></i>
-                  <div className="text-sm font-medium">细节修改</div>
-                </button>
-                <button 
-                  onClick={handleReplaceElement}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all text-center"
-                >
-                  <i className="fas fa-exchange-alt text-2xl text-primary mb-2"></i>
-                  <div className="text-sm font-medium">元素替换</div>
-                </button>
-                <button 
-                  onClick={handleChangeStyle}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-primary hover:shadow-lg transition-all text-center"
-                >
-                  <i className="fas fa-palette text-2xl text-primary mb-2"></i>
-                  <div className="text-sm font-medium">风格调整</div>
-                </button>
-                <button 
-                  onClick={handleDeleteFrame}
-                  className="p-4 border border-gray-200 rounded-lg hover:border-danger hover:shadow-lg transition-all text-center"
-                >
-                  <i className="fas fa-trash text-2xl text-danger mb-2"></i>
-                  <div className="text-sm font-medium">删除分镜</div>
-                </button>
-              </div>
-            </section>
-          )}
         </div>
       </main>
 
@@ -699,15 +566,15 @@ const SceneGenerationPage: React.FC = () => {
       {showExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-text-primary mb-4">导出分镜</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">导出分镜</h3>
             <div className="space-y-4">
               <div>
-                <label htmlFor="export-format" className="block text-sm font-medium text-text-secondary mb-2">导出格式</label>
+                <label htmlFor="export-format" className="block text-sm font-medium text-gray-700 mb-2">导出格式</label>
                 <select 
                   id="export-format"
                   value={exportFormat}
                   onChange={(e) => setExportFormat(e.target.value)}
-                  className={`w-full p-3 border border-gray-300 rounded-lg ${styles.formInputFocus}`}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="png">PNG 图片序列</option>
                   <option value="jpg">JPG 图片序列</option>
@@ -723,7 +590,7 @@ const SceneGenerationPage: React.FC = () => {
                 </button>
                 <button 
                   onClick={handleConfirmExport}
-                  className={`flex-1 py-3 ${styles.btnGradient} text-white rounded-lg`}
+                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all"
                 >
                   确认导出
                 </button>
